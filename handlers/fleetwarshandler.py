@@ -1,4 +1,33 @@
-async def get_fleet_wars_status(bot: "MemoryAlpha") -> List[Dict]:
+import asyncio
+from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING, Dict, List, Optional
+
+import discord
+from pssapi.entities.raw import EngagementRaw
+from pssapi.utils.exceptions import PssApiError
+
+from classes.views.engagementparticipantsview import EngagementParticipantsView
+from data import database_models as models
+from data.constants.galaxy import STAR_SYSTEMS
+from data.databaseclasses import EngagementSystemData, _ensure_aware
+from handlers import databasehandler as crud
+from handlers.databasehandler import get_session
+
+if TYPE_CHECKING:
+    from classes.bot import FleetWarsBot
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def get_system_id_by_name(system_name: str) -> Optional[int]:
+    for sid, name in STAR_SYSTEMS.items():
+        if name.lower() == system_name.lower():
+            return sid
+    return None
+
+
+async def get_fleet_wars_status(bot: "FleetWarsBot") -> List[Dict]:
     now = datetime.now(tz=timezone.utc)
     systems_data = []
 
@@ -57,7 +86,7 @@ async def get_fleet_wars_status(bot: "MemoryAlpha") -> List[Dict]:
     return systems_data
 
 
-async def get_system_status(bot: "MemoryAlpha", system_name: str) -> Optional[Dict]:
+async def get_system_status(bot: "FleetWarsBot", system_name: str) -> Optional[Dict]:
     system_id = get_system_id_by_name(system_name)
     if system_id is None:
         return None
@@ -92,7 +121,7 @@ async def get_system_status(bot: "MemoryAlpha", system_name: str) -> Optional[Di
         'owner': owner_name,
         'cooldown': cooldown_status
     }
-async def get_active_engagements(bot: "MemoryAlpha") -> List[EngagementSystemData]:
+async def get_active_engagements(bot: "FleetWarsBot") -> List[EngagementSystemData]:
     # Get the highest engagement_id from the database to know where to start
     async with get_session() as session:
         last_engagement_id = await crud.get_max_engagement_id(session)
@@ -175,7 +204,7 @@ async def get_active_engagements(bot: "MemoryAlpha") -> List[EngagementSystemDat
     return new_active_engagements
 
 
-async def prune_expired_engagements(bot: "MemoryAlpha") -> int:
+async def prune_expired_engagements(bot: "FleetWarsBot") -> int:
     current_time = datetime.now(timezone.utc)
     pruned_count = 0
 
@@ -322,7 +351,7 @@ async def create_engagement_embed_option(engagements) -> discord.Embed:
     return embed
 
 async def create_engagement_detail_embed(
-                                            bot: "MemoryAlpha",
+                                            bot: "FleetWarsBot",
                                             engagement_id: int) -> tuple[discord.Embed, Optional[discord.ui.View]]:
     # Get max engagement ID from DB
     async with get_session() as session:
@@ -508,7 +537,7 @@ async def create_engagement_detail_embed(
     return embed, view
 
 
-async def refresh_galaxy_state(bot: "MemoryAlpha", force_refresh_all: bool = False) -> int:
+async def refresh_galaxy_state(bot: "FleetWarsBot", force_refresh_all: bool = False) -> int:
     now = datetime.now(timezone.utc)
     refreshed_count = 0
 

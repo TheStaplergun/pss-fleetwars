@@ -1,18 +1,29 @@
+import os
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+from typing import AsyncGenerator, Dict, List, Optional
+
+from sqlalchemy import or_
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy.pool import StaticPool
+from sqlmodel import SQLModel, select
+
+from data import database_models as models
+from sqlmodel.ext.asyncio.session import AsyncSession
+
+DATABASE_URL = "sqlite+aiosqlite:///./data/fleetwars.db"
+
 _engine: AsyncEngine | None = None
 
 async def init_engine():
     global _engine
     if _engine is None:
+        os.makedirs("data", exist_ok=True)
         _engine = create_async_engine(
             DATABASE_URL,
-            future=True,
-            pool_pre_ping=True,
-            connect_args={
-                "timeout": 30,
-                "check_same_thread": False,
-            },
-            pool_size=5,
-            max_overflow=10
+            connect_args={"check_same_thread": False, "timeout": 30},
+            poolclass=StaticPool,
+            echo=False,
         )
         async with _engine.begin() as conn:
             # Enable WAL mode for better concurrency
@@ -147,3 +158,26 @@ async def clear_system_target(session: AsyncSession, system_id: int) -> bool:
         await session.flush()
         return True
     return False
+
+# ============================================================================
+# Dynamic config stubs (FleetRoleMapping / AlertChannel)
+# TODO: finish these when implementing the dynamic admin role + channel system
+# ============================================================================
+
+async def get_all_fleet_role_mappings(session: AsyncSession) -> Dict[str, models.FleetRoleMapping]:
+    """Returns a dict of fleet_name -> FleetRoleMapping for building admin_role_mapping."""
+    result = await session.exec(select(models.FleetRoleMapping))
+    rows = result.all()
+    return {row.fleet_name: row for row in rows}
+
+
+async def get_alert_channel(session: AsyncSession, guild_id: int, channel_type: str = "engagements") -> Optional[models.AlertChannel]:
+    """Returns the AlertChannel row for a given guild and channel type."""
+    stmt = (
+        select(models.AlertChannel)
+        .where(models.AlertChannel.guild_id == guild_id)
+        .where(models.AlertChannel.channel_type == channel_type)
+    )
+    result = await session.exec(stmt)
+    return result.first()
+

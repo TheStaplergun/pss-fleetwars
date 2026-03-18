@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Optional
 
-from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel import Field, SQLModel
 
 class Engagement(SQLModel, table=True):
     __tablename__ = "engagements"
@@ -35,3 +35,27 @@ class GalaxySystem(SQLModel, table=True):
     flagged_by: Optional[int] = Field(default=None)
     admin_role_id: Optional[int] = Field(default=None)
     flagged_at: Optional[datetime] = Field(default=None)
+
+
+class FleetRoleMapping(SQLModel, table=True):
+    """Maps a fleet name to a Discord role ID for engagement alerts.
+    Loaded dynamically; populate via admin commands or direct DB edits."""
+    __tablename__ = "fleet_role_mappings"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    fleet_name: str = Field(index=True, unique=True)
+    admin_role_id: int
+    guild_id: Optional[int] = Field(default=None)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class AlertChannel(SQLModel, table=True):
+    """Stores Discord channel IDs for various alert types (engagements, galaxy, etc.).
+    Loaded dynamically; populate via admin commands or direct DB edits."""
+    __tablename__ = "alert_channels"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    guild_id: int = Field(index=True)
+    channel_id: int
+    channel_type: str = Field(default="engagements")  # e.g. "engagements", "galaxy"
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

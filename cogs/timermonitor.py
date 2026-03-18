@@ -1,22 +1,35 @@
 import asyncio
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 import discord
 from discord.ext import commands, tasks
-from icecream import ic
 
 from data.constants.galaxy import STAR_SYSTEMS
 from handlers import fleetwarshandler, databasehandler
-from handlers.fleetwarshandler import EngagementSystemData
+from data.databaseclasses import EngagementSystemData
+from handlers.databasehandler import get_session
 
 if TYPE_CHECKING:
-    from classes import MemoryAlpha
+    from classes.bot import FleetWarsBot
+
 
 class TimerMonitor(commands.Cog):
-    def __init__(self, bot: "PSS-FleetWars"):
+    def __init__(self, bot: "FleetWarsBot"):
         self.bot = bot
 
+        # TODO: load this dynamically from the fleet_role_mappings DB table.
+        # Structure: { "FleetName": {"admin_id": <discord_role_id>} }
+        # Use databasehandler.get_all_fleet_role_mappings() when ready.
+        self.admin_role_mapping: Dict[str, Dict[str, int]] = {}
+
+    async def cog_load(self) -> None:
+        self.engagements_pulse.start()
+        self.galaxy_state_refresh.start()
+
+    async def cog_unload(self) -> None:
+        self.engagements_pulse.cancel()
+        self.galaxy_state_refresh.cancel()
 
     @tasks.loop(minutes=5)
     async def engagements_pulse(self):
@@ -31,6 +44,14 @@ class TimerMonitor(commands.Cog):
             await asyncio.wait_for(self._galaxy_state_refresh_inner(), timeout=540.0)
         except asyncio.TimeoutError:
             self.bot.logger.error("galaxy_state_refresh timed out after 9 minutes — skipping this cycle.")
+
+    @engagements_pulse.before_loop
+    async def before_engagements_pulse(self):
+        await self.bot.wait_until_ready()
+
+    @galaxy_state_refresh.before_loop
+    async def before_galaxy_state_refresh(self):
+        await self.bot.wait_until_ready()
 
     async def _engagements_pulse_inner(self):
         print(f"Starting engagements pulse at {datetime.now(timezone.utc).isoformat()}")
@@ -49,7 +70,6 @@ class TimerMonitor(commands.Cog):
             print(f"Error in galaxy state refresh: {e}")
 
     async def sync_active_engagements_from_db(self) -> int:
-        import handlers.databasehandler
         try:
             async with get_session() as session:
                 db_active = await databasehandler.get_all_active_engagements(session)  # Dict[int, Engagement]

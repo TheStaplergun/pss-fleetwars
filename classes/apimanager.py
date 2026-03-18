@@ -9,14 +9,17 @@ from discord.app_commands.errors import CommandInvokeError
 from pssapi import PssApiClient
 from pssapi.utils.exceptions import PssApiError
 
-from classes.entities.entities import StarSystemDetail as _StarSystemDetail
 from data.constants.galaxy import STAR_SYSTEMS as STAR_SYSTEM_IDS
 from handlers import errorhandlers
 from private.bot_token import CHECKSUM_KEY, PUBLIC_TOKEN
 
+if TYPE_CHECKING:
+    from pssapi.entities.raw import EngagementRaw
+    from classes.bot import FleetWarsBot
+
 
 class ApiManager:
-    def __init__(self, bot: "MemoryAlpha"):
+    def __init__(self, bot: "FleetWarsBot"):
         self.bot = bot
 
         self.api_call_counter = 0
@@ -40,10 +43,6 @@ class ApiManager:
     @property
     def client(self) -> PssApiClient:
         return self.__client
-
-    @property
-    def fleet_client(self) -> PssFleetDataClient:
-        return self.__fleet_client
 
     # ------------------------------------------------------------------
     # UUID / Token management
@@ -136,6 +135,15 @@ class ApiManager:
         async with self.__token_lock:
             return self.__access_token
 
+    # ------------------------------------------------------------------
+    # PSS API wrappers
+    # ------------------------------------------------------------------
+
+    async def get_engagement(self, engagement_id: int) -> "EngagementRaw":
+        pass # TODO pull from MA
+
+    async def get_galaxy_data(self, system_id: int):
+        pass # TODO pull from MA
     # ------------------------------------------------------------------
     # Core API call machinery
     # ------------------------------------------------------------------
