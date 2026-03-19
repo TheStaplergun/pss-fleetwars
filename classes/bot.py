@@ -17,13 +17,16 @@ class FleetWarsBot(commands.Bot):
         self.cache_manager = None
 
     async def setup_hook(self) -> None:
-        from handlers.databasehandler import init_engine
+        #from handlers.databasehandler import init_engine
         from classes.apimanager import ApiManager
         from classes.cachemanager import CacheManager
-        from cogs.timermonitor import TimerMonitor
         from classes.commands import Commands
+        from cogs.timermonitor import TimerMonitor
+        from database import DatabaseManager
 
-        await init_engine()
+        self.database_manager = DatabaseManager(self)
+        await self.database_manager.async_init()
+        #await init_engine()
 
         self.api_manager = ApiManager(self)
         self.cache_manager = CacheManager(self)
